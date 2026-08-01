@@ -55,8 +55,14 @@ class LayoutApp:
         self.designs: dict[str, Design] = {}
         self.placed: list[dict] = []
         self.selected: int | None = None
-        self.scale = 0.55  # pixels per stud; the plate is ~900 studs across
+        # Placeholders. _fit_view() replaces both from the canvas's REAL size the
+        # first time it is drawn -- a hardcoded scale is wrong the moment either
+        # the plate size or the window size changes, and the plate is ~2250
+        # studs across, so being wrong here means opening deep inside it with no
+        # edge in sight.
+        self.scale = 0.45  # pixels per stud
         self.origin = [520.0, 380.0]
+        self._fitted = False
         self.drag_from: tuple[int, int] | None = None
 
         root.title("Lego House Maker - site plan")
@@ -93,6 +99,7 @@ class LayoutApp:
         tk.Label(bar, text="", bg=BG).pack()
         for label, cmd in [
             ("Reload designs", self.reload_designs_and_draw),
+            ("Fit to plate", self.fit_view),
             ("Open layout...", self.pick_layout),
             ("Save layout", self.save_layout),
         ]:
@@ -119,7 +126,7 @@ class LayoutApp:
         c.bind("<MouseWheel>", self.on_wheel)
         c.bind("<Button-4>", lambda e: self.on_wheel(e, 1))
         c.bind("<Button-5>", lambda e: self.on_wheel(e, -1))
-        c.bind("<Configure>", lambda _e: self.redraw())
+        c.bind("<Configure>", lambda _e: self._on_resize())
         self.root.bind("r", lambda _e: self.rotate_selected())
         self.root.bind("<Delete>", lambda _e: self.delete_selected())
         self.root.bind("<Control-s>", lambda _e: self.save_layout())
@@ -267,6 +274,24 @@ class LayoutApp:
         self.redraw()
 
     # --- drawing ----------------------------------------------------------
+    def _on_resize(self) -> None:
+        if not self._fitted:
+            self.fit_view()
+            return
+        self.redraw()
+
+    def fit_view(self) -> None:
+        """Frame the whole plate, with a small margin, in the canvas as it is now."""
+        w = self.canvas.winfo_width()
+        h = self.canvas.winfo_height()
+        if w <= 1 or h <= 1:  # not laid out yet; the next Configure will do it
+            return
+        span = PLATE_HALF_STUDS * 2.0
+        self.scale = min(w, h) * 0.92 / span
+        self.origin = [w / 2.0, h / 2.0]
+        self._fitted = True
+        self.redraw()
+
     def redraw(self) -> None:
         c = self.canvas
         c.delete("all")
