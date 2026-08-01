@@ -1,0 +1,108 @@
+{
+  "name": "corner_block",
+  "colour": "blue",
+  "roof": true,
+  "footprint": [
+    [
+      0,
+      0
+    ],
+    [
+      80,
+      0
+    ],
+    [
+      80,
+      44
+    ],
+    [
+      44,
+      44
+    ],
+    [
+      44,
+      72
+    ],
+    [
+      0,
+      72
+    ]
+  ],
+  "storeys": [
+    {
+      "wall_courses": 10,
+      "openings": [
+        {
+          "kind": "door",
+          "wall": 0,
+          "from_studs": 34,
+          "width_studs": 12,
+          "sill_courses": 0,
+          "height_courses": 8
+        },
+        {
+          "kind": "window",
+          "wall": 1,
+          "from_studs": 14,
+          "width_studs": 10,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 5,
+          "from_studs": 24,
+          "width_studs": 10,
+          "sill_courses": 4,
+          "height_courses": 4
+        }
+      ],
+      "interior_walls": [
+        {
+          "a": [
+            44,
+            4
+          ],
+          "b": [
+            44,
+            40
+          ]
+        }
+      ],
+      "ramps": [
+        {
+          "at": [
+            66,
+            40
+          ],
+          "direction": "n",
+          "width_studs": 12
+        }
+      ]
+    },
+    {
+      "wall_courses": 10,
+      "openings": [
+        {
+          "kind": "window",
+          "wall": 0,
+          "from_studs": 12,
+          "width_studs": 10,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 0,
+          "from_studs": 56,
+          "width_studs": 10,
+          "sill_courses": 4,
+          "height_courses": 4
+        }
+      ],
+      "interior_walls": [],
+      "ramps": []
+    }
+  ],
+  "schema": 1
+}

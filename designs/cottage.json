@@ -1,0 +1,84 @@
+{
+  "name": "cottage",
+  "colour": "red",
+  "roof": true,
+  "footprint": [
+    [
+      0,
+      0
+    ],
+    [
+      70,
+      0
+    ],
+    [
+      70,
+      56
+    ],
+    [
+      0,
+      56
+    ]
+  ],
+  "storeys": [
+    {
+      "wall_courses": 10,
+      "openings": [
+        {
+          "kind": "door",
+          "wall": 0,
+          "from_studs": 29,
+          "width_studs": 12,
+          "sill_courses": 0,
+          "height_courses": 8
+        },
+        {
+          "kind": "window",
+          "wall": 0,
+          "from_studs": 8,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 0,
+          "from_studs": 52,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 1,
+          "from_studs": 20,
+          "width_studs": 10,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 2,
+          "from_studs": 30,
+          "width_studs": 10,
+          "sill_courses": 4,
+          "height_courses": 4
+        }
+      ],
+      "interior_walls": [
+        {
+          "a": [
+            28,
+            2
+          ],
+          "b": [
+            28,
+            30
+          ]
+        }
+      ],
+      "ramps": []
+    }
+  ],
+  "schema": 1
+}
