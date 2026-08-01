@@ -129,15 +129,33 @@ class LayoutApp:
         self.designs.clear()
         self.design_list.delete(0, tk.END)
         if not self.designs_dir.is_dir():
+            self.status.config(text=f"no such folder: {self.designs_dir}")
             return
-        for path in sorted(self.designs_dir.glob("*.json")):
+        files = sorted(self.designs_dir.glob("*.json"))
+        # A file that fails to load used to be skipped in complete silence,
+        # which is indistinguishable from the file not being there at all --
+        # so a design that WAS saved and a design that never got saved looked
+        # exactly the same from here. Say which ones were skipped and why.
+        skipped: list[str] = []
+        for path in files:
             try:
                 self.designs[path.name] = Design.load(path)
-            except Exception:  # noqa: BLE001 - a bad file should not stop the rest
+            except Exception as exc:  # noqa: BLE001 - one bad file must not stop the rest
+                skipped.append(f"{path.name}: {exc}")
                 continue
             self.design_list.insert(tk.END, path.name)
         if self.design_list.size():
             self.design_list.selection_set(0)
+        if skipped:
+            self.status.config(
+                text=f"{len(self.designs)} loaded, {len(skipped)} skipped from {self.designs_dir}")
+            messagebox.showwarning(
+                "Some designs could not be loaded",
+                f"Read {len(files)} file(s) from {self.designs_dir}.\n\n"
+                "These could not be loaded:\n\n" + "\n\n".join(skipped))
+        else:
+            self.status.config(
+                text=f"{len(self.designs)} design(s) in {self.designs_dir}")
 
     def reload_designs_and_draw(self) -> None:
         self.reload_designs()

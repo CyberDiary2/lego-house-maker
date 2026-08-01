@@ -312,3 +312,58 @@ class TestUndo(unittest.TestCase):
     def test_save_dialog_starts_in_the_design_folder(self):
         from legohouse.app import default_design_dir
         self.assertEqual(self.app._dialog_dir(), str(default_design_dir()))
+
+
+class TestLayoutReload(unittest.TestCase):
+    """A design that fails to load must SAY so, not vanish silently."""
+
+    def setUp(self):
+        try:
+            import tkinter as tk
+            self.root = tk.Tk()
+            self.root.withdraw()
+        except Exception as exc:  # noqa: BLE001
+            raise unittest.SkipTest(f"no display: {exc}")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.dir = Path(self.tmp.name)
+        Design(footprint=[(0, 0), (20, 0), (20, 20), (0, 20)]).save(self.dir / "good.json")
+        (self.dir / "broken.json").write_text("{ this is not json")
+        (self.dir / "wrong_schema.json").write_text(json.dumps({"schema": 99}))
+
+    def tearDown(self):
+        self.root.destroy()
+        self.tmp.cleanup()
+
+    def test_bad_files_are_reported_not_swallowed(self):
+        from legohouse import layout as layout_mod
+        warnings = []
+
+        class FakeBox:
+            @staticmethod
+            def showwarning(title, message):
+                warnings.append(message)
+
+            @staticmethod
+            def showerror(title, message):
+                warnings.append(message)
+
+        real_box = layout_mod.messagebox
+        layout_mod.messagebox = FakeBox
+        try:
+            app = layout_mod.LayoutApp(self.root, self.dir, self.dir / "layout.json")
+        finally:
+            layout_mod.messagebox = real_box
+
+        self.assertEqual(list(app.designs), ["good.json"])
+        self.assertEqual(len(warnings), 1, "the skipped files were not reported")
+        self.assertIn("broken.json", warnings[0])
+        self.assertIn("wrong_schema.json", warnings[0])
+        self.assertIn("1 loaded, 2 skipped", app.status.cget("text"))
+
+    def test_a_clean_folder_reports_the_count_and_path(self):
+        from legohouse import layout as layout_mod
+        (self.dir / "broken.json").unlink()
+        (self.dir / "wrong_schema.json").unlink()
+        app = layout_mod.LayoutApp(self.root, self.dir, self.dir / "layout.json")
+        self.assertIn("1 design(s)", app.status.cget("text"))
+        self.assertIn(str(self.dir), app.status.cget("text"))
