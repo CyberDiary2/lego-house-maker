@@ -194,3 +194,37 @@ class TestWallSegments(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestLayout(unittest.TestCase):
+    """The site plan's own maths: rotation and what gets written out."""
+
+    def setUp(self):
+        from legohouse.layout import rotated_extent
+        self.rotated_extent = rotated_extent
+        self.design = Design(footprint=[(0, 0), (80, 0), (80, 40), (0, 40)])
+
+    def test_rotation_swaps_the_axes_at_90_and_270(self):
+        self.assertEqual(self.rotated_extent(self.design, 0), (80, 40))
+        self.assertEqual(self.rotated_extent(self.design, 90), (40, 80))
+        self.assertEqual(self.rotated_extent(self.design, 180), (80, 40))
+        self.assertEqual(self.rotated_extent(self.design, 270), (40, 80))
+
+    def test_plate_half_matches_the_maps_120_unit_half_extent(self):
+        from legohouse.layout import PLATE_HALF_STUDS
+        self.assertAlmostEqual(PLATE_HALF_STUDS * geo.STUD, 120.0, delta=0.5)
+
+    def test_layout_round_trips_through_json(self):
+        entries = [
+            {"design": "cottage.json", "at_studs": [-140, -90], "rotation": 0},
+            {"design": "corner_block.json", "at_studs": [220, 160], "rotation": 90},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "baseplate.json"
+            path.write_text(json.dumps({"map": "baseplate", "buildings": entries}, indent=2))
+            back = json.loads(path.read_text())["buildings"]
+        self.assertEqual(back, entries)
+
+    def test_rotation_only_ever_takes_the_four_legal_values(self):
+        from legohouse.layout import ROTATIONS
+        self.assertEqual(ROTATIONS, [0, 90, 180, 270])

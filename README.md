@@ -54,6 +54,24 @@ openings, interior walls and ramps belong to the storey you are on.
 **Check design** lists everything wrong at once rather than one problem per
 attempt, so you can fix a building in one pass.
 
+## Placing buildings on a map
+
+Designing a building and deciding where it goes are two different jobs, so they
+are two windows. A design carries no position, because where a house sits is the
+map's business, not the house's.
+
+```sh
+python -m legohouse layout                      # ~/army/designs, baseplate layout
+python -m legohouse layout <designs_dir> <layout.json>
+```
+
+Pick a design on the left, click the plate to drop it, drag to move, `R` rotates
+in 90 degree steps, `Delete` removes. The hill and both spawns are marked so you
+can place around them. **Save layout** writes the file the game reads.
+
+The game reads that file **when it starts**, so the loop is: arrange, save,
+launch. Nothing needs rebuilding.
+
 ## Recommended sizes
 
 Studs and courses are unfamiliar units, so the editor shows a normal value under
