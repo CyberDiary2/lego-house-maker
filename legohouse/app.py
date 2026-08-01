@@ -72,6 +72,9 @@ class DesignerApp:
                 selectcolor=GRID, activebackground=BG, activeforeground=TEXT,
                 anchor="w", width=14, command=self.redraw,
             ).pack(anchor="w")
+        self._hint(bar, "door 12 studs wide")
+        self._hint(bar, "window 8 wide, sill 4, tall 4")
+        self._hint(bar, "footprint 70 x 56 is typical")
 
         tk.Label(bar, text="", bg=BG).pack()
         tk.Label(bar, text="RAMP CLIMBS", bg=BG, fg=TEXT).pack(anchor="w")
@@ -79,11 +82,16 @@ class DesignerApp:
             bar, textvariable=self.ramp_dir, width=12, state="readonly",
             values=["n", "s", "e", "w"],
         ).pack(anchor="w")
+        self._hint(bar, "ramp 12 studs wide")
+        self.ramp_hint = tk.Label(bar, text="", bg=BG, fg=GRID_MAJOR, justify="left")
+        self.ramp_hint.pack(anchor="w")
 
         tk.Label(bar, text="", bg=BG).pack()
         tk.Label(bar, text="STOREY", bg=BG, fg=TEXT).pack(anchor="w")
         self.storey_label = tk.Label(bar, text="1 of 1", bg=BG, fg=TEXT)
         self.storey_label.pack(anchor="w")
+        self._hint(bar, "2 is typical; each one above")
+        self._hint(bar, "the first needs a ramp")
         row = tk.Frame(bar, bg=BG)
         row.pack(anchor="w")
         tk.Button(row, text="<", width=2, command=lambda: self.switch_storey(-1)).pack(side=tk.LEFT)
@@ -98,6 +106,7 @@ class DesignerApp:
             bar, from_=1, to=40, textvariable=self.height_var, width=6,
             command=self.apply_height,
         ).pack(anchor="w")
+        self._hint(bar, "default 10 = one storey")
         self.height_hint = tk.Label(bar, text="", bg=BG, fg=GRID_MAJOR)
         self.height_hint.pack(anchor="w")
 
@@ -135,6 +144,16 @@ class DesignerApp:
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.status = tk.Label(right, text="", bg=BG, fg=TEXT, anchor="w")
         self.status.pack(fill=tk.X)
+
+    def _hint(self, parent: tk.Widget, text: str) -> None:
+        """A dim one-liner under a control saying what a normal value is.
+
+        Worth the screen space: studs and courses are unfamiliar units, and
+        without a reference every field is a guess. The numbers are the ones the
+        game's own buildings use -- see geometry.DEFAULTS.
+        """
+        tk.Label(parent, text=text, bg=BG, fg=GRID_MAJOR,
+                 font=("TkDefaultFont", 8)).pack(anchor="w")
 
     def _bind(self) -> None:
         c = self.canvas
@@ -410,6 +429,8 @@ class DesignerApp:
         self.storey_label.config(text=f"{self.storey_index + 1} of {len(self.design.storeys)}")
         courses = self.storey.wall_courses
         self.height_hint.config(text=f"= {geo.courses_to_units(courses):.2f} world units")
+        self.ramp_hint.config(
+            text=f"needs {geo.ramp_run_studs(courses)} studs of run\nto climb this storey")
         self._draw_grid()
         self._draw_footprint()
         self._draw_storey()

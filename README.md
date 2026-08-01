@@ -54,6 +54,25 @@ openings, interior walls and ramps belong to the storey you are on.
 **Check design** lists everything wrong at once rather than one problem per
 attempt, so you can fix a building in one pass.
 
+## Recommended sizes
+
+Studs and courses are unfamiliar units, so the editor shows a normal value under
+each control. These are the numbers the game's own buildings already use, and a
+soldier is 1.8 world units tall, about 7 brick courses, which is what makes them
+feel right.
+
+| | default | why |
+| --- | --- | --- |
+| wall height | **10 courses** | one storey, 3.2 units. 7 is head height on a soldier; below that it is a crawlspace. 20 makes a tall hall. |
+| storeys | **2** | every storey above the first needs a ramp under it, or bots can never reach it |
+| doorway | **12 studs** wide | under about 6 and soldiers snag on the frame |
+| window | **8 wide, sill 4, height 4** | puts it at chest height on a standing soldier |
+| ramp | **12 studs** wide | narrower works, but bots path down the middle and bunch up |
+| footprint | **70 x 56 studs** | about 19 x 15 units, the size of the buildings already in the game. Much under 40 x 40 leaves no room inside for a ramp. |
+
+The ramp panel also shows, live, how many studs of run the current wall height
+needs, so you can see whether a ramp will physically fit before you place it.
+
 ## Why ramps matter
 
 The game's bots path purely on a baked navmesh and **cannot jump at all**. A

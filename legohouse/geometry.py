@@ -117,3 +117,40 @@ def point_in_footprint(footprint: list[tuple[int, int]], x: float, y: float) -> 
             if x < cross_x:
                 inside = not inside
     return inside
+
+
+# --- recommended sizes -------------------------------------------------------
+# What "normal" looks like, so the editor can show it next to each control and
+# you are not guessing at numbers with no reference. These are the values the
+# game's own hand-built buildings use, and a soldier is 1.8 world units tall
+# (about 7 brick courses), which is what makes them feel right.
+DEFAULTS = {
+    "wall_courses": 10,      # one storey; 3.2 units, comfortable headroom
+    "storeys": 2,
+    "door_width_studs": 12,
+    "door_height_courses": 8,
+    "window_width_studs": 8,
+    "window_sill_courses": 4,
+    "window_height_courses": 4,
+    "ramp_width_studs": 12,
+    "building_width_studs": 70,
+    "building_depth_studs": 56,
+}
+
+# Shown under the matching control. Kept as prose rather than bare numbers
+# because the useful part is usually WHY, not the value.
+HINTS = {
+    "wall_courses": "10 = one normal storey. 7 is head height on a soldier; "
+                    "under that feels like a crawlspace. 20 makes a tall hall.",
+    "door_width_studs": "12 studs is a normal doorway. Under 6 and soldiers "
+                        "snag on the frame.",
+    "window_sill_courses": "sill 4, height 4 puts a window at chest height on "
+                           "a standing soldier.",
+    "ramp_width_studs": "12 studs. Narrower still works, but bots path down "
+                        "the middle and bunch up on it.",
+    "footprint": "70 x 56 studs (about 19 x 15 units) is the size of the "
+                 "buildings already in the game. Much under 40 x 40 and there "
+                 "is no room inside for a ramp.",
+    "storeys": "2 is typical. Every storey above the first needs a ramp under "
+               "it or bots can never get up there.",
+}
