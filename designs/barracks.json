@@ -1,0 +1,260 @@
+{
+  "name": "barracks",
+  "colour": "red",
+  "roof": true,
+  "footprint": [
+    [
+      190,
+      10
+    ],
+    [
+      39,
+      10
+    ],
+    [
+      39,
+      80
+    ],
+    [
+      190,
+      80
+    ]
+  ],
+  "storeys": [
+    {
+      "wall_courses": 10,
+      "openings": [
+        {
+          "kind": "door",
+          "wall": 1,
+          "from_studs": 34,
+          "width_studs": 12,
+          "sill_courses": 0,
+          "height_courses": 8
+        },
+        {
+          "kind": "door",
+          "wall": 3,
+          "from_studs": 24,
+          "width_studs": 12,
+          "sill_courses": 0,
+          "height_courses": 8
+        },
+        {
+          "kind": "window",
+          "wall": 1,
+          "from_studs": 16,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 3,
+          "from_studs": 46,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 2,
+          "from_studs": 17,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 2,
+          "from_studs": 47,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 2,
+          "from_studs": 77,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 2,
+          "from_studs": 107,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 0,
+          "from_studs": 36,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 0,
+          "from_studs": 66,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 0,
+          "from_studs": 96,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        },
+        {
+          "kind": "window",
+          "wall": 0,
+          "from_studs": 126,
+          "width_studs": 8,
+          "sill_courses": 4,
+          "height_courses": 4
+        }
+      ],
+      "interior_walls": [
+        {
+          "a": [
+            80,
+            35
+          ],
+          "b": [
+            80,
+            10
+          ]
+        },
+        {
+          "a": [
+            160,
+            60
+          ],
+          "b": [
+            160,
+            80
+          ]
+        },
+        {
+          "a": [
+            160,
+            10
+          ],
+          "b": [
+            160,
+            35
+          ]
+        },
+        {
+          "a": [
+            130,
+            10
+          ],
+          "b": [
+            130,
+            35
+          ]
+        },
+        {
+          "a": [
+            130,
+            80
+          ],
+          "b": [
+            130,
+            60
+          ]
+        },
+        {
+          "a": [
+            80,
+            80
+          ],
+          "b": [
+            80,
+            60
+          ]
+        },
+        {
+          "a": [
+            106,
+            80
+          ],
+          "b": [
+            107,
+            80
+          ]
+        },
+        {
+          "a": [
+            80,
+            60
+          ],
+          "b": [
+            50,
+            60
+          ]
+        },
+        {
+          "a": [
+            80,
+            35
+          ],
+          "b": [
+            50,
+            35
+          ]
+        },
+        {
+          "a": [
+            80,
+            35
+          ],
+          "b": [
+            118,
+            35
+          ]
+        },
+        {
+          "a": [
+            80,
+            60
+          ],
+          "b": [
+            119,
+            60
+          ]
+        },
+        {
+          "a": [
+            130,
+            60
+          ],
+          "b": [
+            145,
+            60
+          ]
+        },
+        {
+          "a": [
+            130,
+            35
+          ],
+          "b": [
+            145,
+            35
+          ]
+        }
+      ],
+      "ramps": []
+    }
+  ],
+  "schema": 1
+}

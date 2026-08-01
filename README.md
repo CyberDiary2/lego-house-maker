@@ -54,6 +54,21 @@ openings, interior walls and ramps belong to the storey you are on.
 **Check design** lists everything wrong at once rather than one problem per
 attempt, so you can fix a building in one pass.
 
+
+## Undo, and where files go
+
+`Ctrl+Z` (or the **Undo** button) steps back through everything you have done to
+the design: doors, windows, interior walls, ramps, erases, storeys added or
+removed, wall height, colour and roof. While you are still drawing a footprint
+it walks back one corner at a time instead, since the footprint is not part of
+the design until you close it. The stack holds the last 120 edits.
+
+**Save** and **Open** start in `~/army/designs`, which is the folder the game
+reads at startup and the folder the site plan lists. A design saved anywhere
+else will not appear in either. The window title shows the file you are editing
+and gains a `*` while there are unsaved changes; closing the window with unsaved
+changes asks before throwing them away.
+
 ## Placing buildings on a map
 
 Designing a building and deciding where it goes are two different jobs, so they

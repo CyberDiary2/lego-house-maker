@@ -211,8 +211,10 @@ class TestLayout(unittest.TestCase):
         self.assertEqual(self.rotated_extent(self.design, 270), (40, 80))
 
     def test_plate_half_matches_the_maps_120_unit_half_extent(self):
-        from legohouse.layout import PLATE_HALF_STUDS
-        self.assertAlmostEqual(PLATE_HALF_STUDS * geo.STUD, 120.0, delta=0.5)
+        from legohouse.layout import PLATE_HALF_STUDS, PLATE_HALF_UNITS
+        self.assertAlmostEqual(PLATE_HALF_STUDS * geo.STUD, PLATE_HALF_UNITS, delta=0.5)
+        # the map in the game is 600 x 600 units; if that changes, this changes
+        self.assertEqual(PLATE_HALF_UNITS, 300.0)
 
     def test_layout_round_trips_through_json(self):
         entries = [
@@ -228,3 +230,85 @@ class TestLayout(unittest.TestCase):
     def test_rotation_only_ever_takes_the_four_legal_values(self):
         from legohouse.layout import ROTATIONS
         self.assertEqual(ROTATIONS, [0, 90, 180, 270])
+
+
+class TestUndo(unittest.TestCase):
+    """Drives the real tkinter app. Skipped where there is no display."""
+
+    def setUp(self):
+        try:
+            import tkinter as tk
+            self.root = tk.Tk()
+            self.root.withdraw()
+        except Exception as exc:  # noqa: BLE001 - no X display on CI
+            raise unittest.SkipTest(f"no display: {exc}")
+        from legohouse.app import DesignerApp
+        from legohouse.model import Design
+        d = Design(footprint=[(0, 0), (40, 0), (40, 30), (0, 30)])
+        self.app = DesignerApp(self.root, d)
+
+    def tearDown(self):
+        self.root.destroy()
+
+    def test_undo_restores_an_erased_door(self):
+        app = self.app
+        app.place_opening(20, 0, "door")
+        self.assertEqual(len(app.storey.openings), 1)
+        app.erase_at(20, 0)
+        self.assertEqual(len(app.storey.openings), 0)
+        app.undo()
+        self.assertEqual(len(app.storey.openings), 1, "undo did not bring the door back")
+        app.undo()
+        self.assertEqual(len(app.storey.openings), 0, "undo did not remove the door again")
+
+    def test_undo_walks_back_several_edits(self):
+        app = self.app
+        app.place_opening(20, 0, "door")
+        app.place_opening(10, 30, "window")
+        app.add_storey()
+        self.assertEqual(len(app.design.storeys), 2)
+        app.undo()
+        self.assertEqual(len(app.design.storeys), 1)
+        app.undo()
+        self.assertEqual(len(app.storey.openings), 1)
+        app.undo()
+        self.assertEqual(len(app.storey.openings), 0)
+        app.undo()  # empty stack must not raise
+        self.assertEqual(len(app.storey.openings), 0)
+
+    def test_undo_restores_colour_and_height(self):
+        app = self.app
+        before_colour, before_height = app.design.colour, app.storey.wall_courses
+        app.colour_var.set("blue")
+        app.apply_colour()
+        app.height_var.set(before_height + 6)
+        app.apply_height()
+        self.assertEqual(app.storey.wall_courses, before_height + 6)
+        app.undo()
+        self.assertEqual(app.storey.wall_courses, before_height)
+        self.assertEqual(app.height_var.get(), before_height, "widget did not follow the undo")
+        app.undo()
+        self.assertEqual(app.design.colour, before_colour)
+        self.assertEqual(app.colour_var.get(), before_colour)
+
+    def test_undo_mid_draw_steps_back_one_corner(self):
+        app = self.app
+        app.draft = [(0, 0), (10, 0), (10, 10)]
+        app.undo()
+        self.assertEqual(app.draft, [(0, 0), (10, 0)])
+
+    def test_editing_marks_dirty_and_saving_clears_it(self):
+        app = self.app
+        self.assertFalse(app.dirty)
+        app.place_opening(20, 0, "door")
+        self.assertTrue(app.dirty)
+        self.assertIn("*", self.root.title())
+        with tempfile.TemporaryDirectory() as tmp:
+            app.path = Path(tmp) / "house.json"
+            app.save_design()
+        self.assertFalse(app.dirty)
+        self.assertNotIn("*", self.root.title())
+
+    def test_save_dialog_starts_in_the_design_folder(self):
+        from legohouse.app import default_design_dir
+        self.assertEqual(self.app._dialog_dir(), str(default_design_dir()))

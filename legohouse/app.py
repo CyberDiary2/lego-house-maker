@@ -32,6 +32,19 @@ TEXT = "#d8d2b8"
 
 DIRECTION_VECTORS = {"n": (0, -1), "s": (0, 1), "e": (1, 0), "w": (-1, 0)}
 
+# Where Open and Save start. This is the folder the game reads at startup and
+# the folder the site plan lists, so a design saved anywhere else is invisible
+# to both. The dialogs used to open on the process's working directory, which
+# meant a design could be saved somewhere perfectly valid and then simply never
+# turn up again.
+DEFAULT_DESIGN_DIR = Path.home() / "army" / "designs"
+
+
+def default_design_dir() -> Path:
+    if DEFAULT_DESIGN_DIR.is_dir():
+        return DEFAULT_DESIGN_DIR
+    return Path(__file__).resolve().parent.parent / "designs"
+
 
 class DesignerApp:
     def __init__(self, root: tk.Tk, design: Design | None = None, path: Path | None = None):
@@ -46,11 +59,19 @@ class DesignerApp:
         self.draft: list[tuple[int, int]] = []  # footprint being drawn
         self.drag_start: tuple[int, int] | None = None
         self.drag_now: tuple[int, int] | None = None
+        # Undo keeps whole-design snapshots rather than a list of inverse
+        # operations. A design is a few kilobytes of plain dicts, so copying one
+        # is free at this scale, and it means undo cannot drift out of step with
+        # the model the way hand-written inverses do once an edit touches more
+        # than one field (erasing a wall, changing storey count, and so on).
+        self._undo: list[tuple[dict, int]] = []
+        self.dirty = False
 
         root.title("Lego House Maker")
         root.configure(bg=BG)
         self._build_ui()
         self._bind()
+        self._retitle()
         self.redraw()
 
     # --- layout -----------------------------------------------------------
@@ -129,6 +150,7 @@ class DesignerApp:
 
         tk.Label(bar, text="", bg=BG).pack()
         for label, cmd in [
+            ("Undo  (Ctrl+Z)", self.undo),
             ("New", self.new_design),
             ("Open...", self.open_design),
             ("Save", self.save_design),
@@ -170,7 +192,9 @@ class DesignerApp:
         c.bind("<Configure>", lambda _e: self.redraw())
         self.root.bind("<Escape>", lambda _e: self.cancel_draft())
         self.root.bind("<Control-s>", lambda _e: self.save_design())
-        self.root.bind("<Control-z>", lambda _e: self.undo_point())
+        self.root.bind("<Control-z>", lambda _e: self.undo())
+        self.root.bind("<Control-Z>", lambda _e: self.undo())
+        self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
     # --- state helpers ----------------------------------------------------
     @property
@@ -237,6 +261,7 @@ class DesignerApp:
     def place_footprint_point(self, x: float, y: float) -> None:
         point = (int(x), int(y))
         if not self.draft:
+            self._push_undo()
             self.design.footprint = []
             self.draft = [point]
             return
@@ -276,6 +301,7 @@ class DesignerApp:
         if span < width:
             self.status.config(text=f"wall {wall_index} is only {span} studs long")
             return
+        self._push_undo()
         if kind == "door":
             self.storey.openings.append(
                 Opening(kind="door", wall=wall_index, from_studs=start,
@@ -318,6 +344,7 @@ class DesignerApp:
         if problems:
             self.status.config(text=problems[0])
             return
+        self._push_undo()
         self.storey.ramps.append(ramp)
         run = geo.ramp_run_studs(self.storey.wall_courses)
         self.status.config(text=f"ramp climbing {ramp.direction} over {run} studs")
@@ -328,16 +355,19 @@ class DesignerApp:
             wall_index, along, _span = hit
             for opening in list(self.storey.openings):
                 if opening.wall == wall_index and opening.from_studs <= along <= opening.from_studs + opening.width_studs:
+                    self._push_undo()
                     self.storey.openings.remove(opening)
                     self.status.config(text=f"removed {opening.kind}")
                     return
         for wall in list(self.storey.interior_walls):
             if self._near_segment(x, y, wall.a, wall.b):
+                self._push_undo()
                 self.storey.interior_walls.remove(wall)
                 self.status.config(text="removed interior wall")
                 return
         for ramp in list(self.storey.ramps):
             if abs(ramp.at[0] - x) <= 2 and abs(ramp.at[1] - y) <= 2:
+                self._push_undo()
                 self.storey.ramps.remove(ramp)
                 self.status.config(text="removed ramp")
                 return
@@ -348,10 +378,46 @@ class DesignerApp:
             return abs(x - a[0]) <= tolerance and min(a[1], b[1]) <= y <= max(a[1], b[1])
         return abs(y - a[1]) <= tolerance and min(a[0], b[0]) <= x <= max(a[0], b[0])
 
-    def undo_point(self) -> None:
+    UNDO_DEPTH = 120
+
+    def _push_undo(self) -> None:
+        """Call immediately BEFORE any edit to the design. Also marks it unsaved."""
+        self._undo.append((self.design.to_dict(), self.storey_index))
+        if len(self._undo) > self.UNDO_DEPTH:
+            self._undo.pop(0)
+        self.dirty = True
+        self._retitle()
+
+    def undo(self) -> None:
+        # While a footprint is being drawn, undo walks back one corner at a
+        # time -- the draft is not part of the design yet, so there is nothing
+        # on the stack for it, and stepping back a corner is what you want
+        # mid-draw anyway.
         if self.draft:
             self.draft.pop()
             self.redraw()
+            return
+        if not self._undo:
+            self.status.config(text="nothing to undo")
+            return
+        data, storey_index = self._undo.pop()
+        self.design = Design.from_dict(data)
+        self.storey_index = min(storey_index, len(self.design.storeys) - 1)
+        self.dirty = True
+        self._sync_controls()
+        self.status.config(text=f"undo ({len(self._undo)} left)")
+        self.redraw()
+
+    def _sync_controls(self) -> None:
+        """Push the design's own values back into the side-panel widgets."""
+        self.height_var.set(self.storey.wall_courses)
+        self.colour_var.set(self.design.colour)
+        self.roof_var.set(self.design.roof)
+        self._retitle()
+
+    def _retitle(self) -> None:
+        name = self.path.name if self.path else "unsaved design"
+        self.root.title(f"Lego House Maker - {name}{' *' if self.dirty else ''}")
 
     def cancel_draft(self) -> None:
         self.draft = []
@@ -365,6 +431,7 @@ class DesignerApp:
         self.redraw()
 
     def add_storey(self) -> None:
+        self._push_undo()
         self.design.storeys.insert(self.storey_index + 1, Storey(wall_courses=self.storey.wall_courses))
         self.storey_index += 1
         self.height_var.set(self.storey.wall_courses)
@@ -374,6 +441,7 @@ class DesignerApp:
         if len(self.design.storeys) == 1:
             self.status.config(text="a building needs at least one storey")
             return
+        self._push_undo()
         self.design.storeys.pop(self.storey_index)
         self.storey_index = min(self.storey_index, len(self.design.storeys) - 1)
         self.height_var.set(self.storey.wall_courses)
@@ -381,17 +449,24 @@ class DesignerApp:
 
     def apply_height(self) -> None:
         try:
-            self.storey.wall_courses = max(1, int(self.height_var.get()))
+            courses = max(1, int(self.height_var.get()))
         except (tk.TclError, ValueError):
             return
+        if courses != self.storey.wall_courses:
+            self._push_undo()
+            self.storey.wall_courses = courses
         self.redraw()
 
     def apply_colour(self) -> None:
-        self.design.colour = self.colour_var.get()
+        if self.colour_var.get() != self.design.colour:
+            self._push_undo()
+            self.design.colour = self.colour_var.get()
         self.redraw()
 
     def apply_roof(self) -> None:
-        self.design.roof = bool(self.roof_var.get())
+        if bool(self.roof_var.get()) != self.design.roof:
+            self._push_undo()
+            self.design.roof = bool(self.roof_var.get())
 
     # --- view -------------------------------------------------------------
     def _pan_start(self, event) -> None:
@@ -514,16 +589,22 @@ class DesignerApp:
 
     # --- files ------------------------------------------------------------
     def new_design(self) -> None:
+        if not self.confirm_discard("New design"):
+            return
         self.design = Design()
         self.path = None
         self.storey_index = 0
         self.draft = []
-        self.height_var.set(self.storey.wall_courses)
-        self.colour_var.set(self.design.colour)
+        self._undo.clear()
+        self.dirty = False
+        self._sync_controls()
         self.redraw()
 
     def open_design(self) -> None:
-        path = filedialog.askopenfilename(filetypes=[("Lego house", "*.json")])
+        if not self.confirm_discard("Open another design"):
+            return
+        path = filedialog.askopenfilename(filetypes=[("Lego house", "*.json")],
+                                          initialdir=self._dialog_dir())
         if not path:
             return
         try:
@@ -533,10 +614,13 @@ class DesignerApp:
             return
         self.path = Path(path)
         self.storey_index = 0
-        self.height_var.set(self.storey.wall_courses)
-        self.colour_var.set(self.design.colour)
-        self.roof_var.set(self.design.roof)
+        self._undo.clear()
+        self.dirty = False
+        self._sync_controls()
         self.redraw()
+
+    def _dialog_dir(self) -> str:
+        return str(self.path.parent if self.path else default_design_dir())
 
     def save_design(self) -> None:
         if self.path is None:
@@ -544,15 +628,40 @@ class DesignerApp:
             return
         self.design.name = self.path.stem
         self.design.save(self.path)
-        self.status.config(text=f"saved {self.path}")
+        self.dirty = False
+        self._retitle()
+        self.status.config(text=f"saved to {self.path}")
 
     def save_design_as(self) -> None:
-        path = filedialog.asksaveasfilename(defaultextension=".json",
-                                            filetypes=[("Lego house", "*.json")])
+        path = filedialog.asksaveasfilename(
+            defaultextension=".json",
+            filetypes=[("Lego house", "*.json")],
+            initialdir=self._dialog_dir(),
+            initialfile=(self.path.name if self.path else f"{self.design.name}.json"))
         if not path:
+            # A cancelled dialog used to leave no trace at all, so a design that
+            # was never written looked exactly like one that was.
+            self.status.config(text="not saved (save cancelled)")
             return
         self.path = Path(path)
         self.save_design()
+
+    def confirm_discard(self, what: str) -> bool:
+        """True if it is safe to throw the current design away."""
+        if not self.dirty:
+            return True
+        answer = messagebox.askyesnocancel(
+            what, "This design has unsaved changes. Save it first?")
+        if answer is None:
+            return False
+        if answer:
+            self.save_design()
+            return not self.dirty  # a cancelled Save As leaves it dirty
+        return True
+
+    def on_close(self) -> None:
+        if self.confirm_discard("Quit"):
+            self.root.destroy()
 
     def show_problems(self) -> None:
         problems = self.design.validate()

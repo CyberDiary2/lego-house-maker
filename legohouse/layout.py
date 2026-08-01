@@ -27,8 +27,14 @@ TEXT = "#d8d2b8"
 SELECTED = "#f0d060"
 MARKER = "#6f7f6a"
 
-# The Baseplate, in studs. Its playable half-extent is 120 world units.
-PLATE_HALF_STUDS = int(120.0 / geo.STUD)
+# The Baseplate, in studs. Keep PLATE_HALF_UNITS in step with the `half` local
+# in tools/build_scenes.gd's _build_world_baseplate() -- it is the one number
+# that decides how big the map is, and if the two disagree this editor will
+# happily place buildings off the edge of the world.
+PLATE_HALF_UNITS = 300.0
+PLATE_HALF_STUDS = int(PLATE_HALF_UNITS / geo.STUD)
+# spawns sit 32 units in from each edge (see the spawn ring in the same builder)
+SPAWN_INSET_STUDS = int((PLATE_HALF_UNITS - 32.0) / geo.STUD)
 
 ROTATIONS = [0, 90, 180, 270]
 
@@ -255,8 +261,8 @@ class LayoutApp:
             c.create_line(*self.screen(-half, v), *self.screen(half, v), fill=GRID)
         # the fixed furniture, so you can place around it
         for label, x, y in [("hill", 0, 0),
-                            ("green spawn", 0, int(96 / geo.STUD)),
-                            ("tan spawn", 0, -int(96 / geo.STUD))]:
+                            ("green spawn", 0, SPAWN_INSET_STUDS),
+                            ("tan spawn", 0, -SPAWN_INSET_STUDS)]:
             sx, sy = self.screen(x, y)
             c.create_oval(sx - 6, sy - 6, sx + 6, sy + 6, outline=MARKER)
             c.create_text(sx, sy - 14, text=label, fill=MARKER, font=("TkDefaultFont", 8))
