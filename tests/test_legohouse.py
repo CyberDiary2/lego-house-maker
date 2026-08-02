@@ -58,6 +58,35 @@ class TestGeometry(unittest.TestCase):
         self.assertFalse(geo.point_in_footprint(ELL, 50, 50))
 
 
+class TestInteriorWallClip(unittest.TestCase):
+    # SQUARE is (0,0)-(70,56); exterior walls are 2 studs thick and centred on
+    # that line, so the inner faces sit at x=1, x=69, y=1, y=55.
+    def test_full_width_wall_is_cut_to_inner_faces(self):
+        # drawn wall-centre to wall-centre; both ends should pull in 1 stud
+        self.assertEqual(geo.clip_interior_wall(SQUARE, (0, 28), (70, 28)),
+                         ((1, 28), (69, 28)))
+
+    def test_overshooting_wall_is_cut_back_inside(self):
+        # drawn past the building on both ends
+        self.assertEqual(geo.clip_interior_wall(SQUARE, (-20, 28), (90, 28)),
+                         ((1, 28), (69, 28)))
+
+    def test_vertical_wall_is_cut_on_y(self):
+        self.assertEqual(geo.clip_interior_wall(SQUARE, (35, 0), (35, 56)),
+                         ((35, 1), (35, 55)))
+
+    def test_wall_already_clear_is_untouched(self):
+        self.assertEqual(geo.clip_interior_wall(SQUARE, (10, 28), (60, 28)),
+                         ((10, 28), (60, 28)))
+
+    def test_wall_drawn_outside_the_building_is_rejected(self):
+        self.assertIsNone(geo.clip_interior_wall(SQUARE, (100, 28), (120, 28)))
+
+    def test_only_one_end_pokes_out(self):
+        self.assertEqual(geo.clip_interior_wall(SQUARE, (20, 28), (70, 28)),
+                         ((20, 28), (69, 28)))
+
+
 class TestValidation(unittest.TestCase):
     def base(self, storeys=1):
         return Design(footprint=list(SQUARE),
@@ -109,8 +138,14 @@ class TestValidation(unittest.TestCase):
         d.storeys[0].ramps.append(Ramp(at=(10, 1), direction="n"))
         self.assertTrue(any("outside the building" in p for p in d.validate()))
 
-    def test_ramp_on_the_top_storey_leads_nowhere(self):
+    def test_ramp_on_the_top_storey_with_a_roof_reaches_it(self):
+        d = self.base()  # roof defaults to True
+        d.storeys[0].ramps.append(Ramp(at=(10, 50), direction="n"))
+        self.assertEqual(d.validate(), [])
+
+    def test_ramp_on_the_top_storey_without_a_roof_leads_nowhere(self):
         d = self.base()
+        d.roof = False
         d.storeys[0].ramps.append(Ramp(at=(10, 50), direction="n"))
         self.assertTrue(any("leads nowhere" in p for p in d.validate()))
 
@@ -210,11 +245,12 @@ class TestLayout(unittest.TestCase):
         self.assertEqual(self.rotated_extent(self.design, 180), (80, 40))
         self.assertEqual(self.rotated_extent(self.design, 270), (40, 80))
 
-    def test_plate_half_matches_the_maps_120_unit_half_extent(self):
+    def test_plate_half_matches_the_maps_90_unit_half_extent(self):
         from legohouse.layout import PLATE_HALF_STUDS, PLATE_HALF_UNITS
         self.assertAlmostEqual(PLATE_HALF_STUDS * geo.STUD, PLATE_HALF_UNITS, delta=0.5)
-        # the map in the game is 600 x 600 units; if that changes, this changes
-        self.assertEqual(PLATE_HALF_UNITS, 300.0)
+        # the map in the game is 180 x 180 units, matching Lego City; if that
+        # changes, this changes
+        self.assertEqual(PLATE_HALF_UNITS, 90.0)
 
     def test_layout_round_trips_through_json(self):
         entries = [

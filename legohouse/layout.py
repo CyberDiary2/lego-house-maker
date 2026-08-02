@@ -31,10 +31,10 @@ MARKER = "#6f7f6a"
 # in tools/build_scenes.gd's _build_world_baseplate() -- it is the one number
 # that decides how big the map is, and if the two disagree this editor will
 # happily place buildings off the edge of the world.
-PLATE_HALF_UNITS = 300.0
+PLATE_HALF_UNITS = 90.0
 PLATE_HALF_STUDS = int(PLATE_HALF_UNITS / geo.STUD)
-# spawns sit 32 units in from each edge (see the spawn ring in the same builder)
-SPAWN_INSET_STUDS = int((PLATE_HALF_UNITS - 32.0) / geo.STUD)
+
+HELI = "#d9a441"  # helicopter pads, amber so they stand out from the rest
 
 ROTATIONS = [0, 90, 180, 270]
 
@@ -302,13 +302,45 @@ class LayoutApp:
         for v in range(-half + step, half, step):
             c.create_line(*self.screen(v, -half), *self.screen(v, half), fill=GRID)
             c.create_line(*self.screen(-half, v), *self.screen(half, v), fill=GRID)
-        # the fixed furniture, so you can place around it
-        for label, x, y in [("hill", 0, 0),
-                            ("green spawn", 0, SPAWN_INSET_STUDS),
-                            ("tan spawn", 0, -SPAWN_INSET_STUDS)]:
+        # the plate centre: the 0 lines at_studs is measured from, drawn bolder
+        c.create_line(*self.screen(0, -half), *self.screen(0, half), fill=GRID_MAJOR, width=2)
+        c.create_line(*self.screen(-half, 0), *self.screen(half, 0), fill=GRID_MAJOR, width=2)
+        # The map's fixed furniture, drawn so you can place buildings CLEAR of it
+        # -- the helicopters especially, which spawn parked and will jam against a
+        # wall dropped on their pad. Every position is derived from PLATE_HALF_UNITS
+        # with the same formulas tools/build_scenes.gd's _build_world_baseplate()
+        # uses, so the overlay tracks the real map even after the plate is resized.
+        # Green is at negative Y, tan at positive Y, matching the game's z axis.
+        H = PLATE_HALF_UNITS
+
+        def u(units: float) -> int:
+            return int(round(units / geo.STUD))
+
+        # The parked UH-1N reaches ~9.95 units past its pad at the nose and 5.7 to
+        # the rotor tip; an 11-unit ring clears the whole airframe (see the heli
+        # collision box in _build_helicopter). label, x, y, clearance radius, colour:
+        heli_r = u(11.0)
+        furniture = [
+            ("hill", 0, 0, 0, MARKER),
+            ("green flag", 0, -u(H - 24), 0, MARKER),
+            ("tan flag", 0, u(H - 24), 0, MARKER),
+            ("green spawn", 0, -u(H - 16), 0, MARKER),
+            ("tan spawn", 0, u(H - 16), 0, MARKER),
+            ("bazooka", -u(H - 40), 0, 0, MARKER),
+            ("bazooka", u(H - 40), 0, 0, MARKER),
+            ("green heli", u(40), -u(H - 18), heli_r, HELI),
+            ("tan heli", u(40), u(H - 18), heli_r, HELI),
+        ]
+        for label, x, y, r, col in furniture:
             sx, sy = self.screen(x, y)
-            c.create_oval(sx - 6, sy - 6, sx + 6, sy + 6, outline=MARKER)
-            c.create_text(sx, sy - 14, text=label, fill=MARKER, font=("TkDefaultFont", 8))
+            if r:
+                rp = r * self.scale
+                c.create_oval(sx - rp, sy - rp, sx + rp, sy + rp, outline=col, dash=(4, 3))
+                ty = sy - rp - 6
+            else:
+                ty = sy - 14
+            c.create_oval(sx - 5, sy - 5, sx + 5, sy + 5, outline=col)
+            c.create_text(sx, ty, text=label, fill=col, font=("TkDefaultFont", 8))
         for i, entry in enumerate(self.placed):
             design = self.designs.get(entry.get("design", ""))
             cx, cy = entry.get("at_studs", [0, 0])
@@ -332,6 +364,72 @@ class LayoutApp:
             self.sel_label.config(text=f"{e['design']}\nat {e['at_studs'][0]}, {e['at_studs'][1]}\n{e['rotation']} degrees")
         else:
             self.sel_label.config(text="none")
+        # drawn last so the gutter strips sit on top of the map edges
+        self._draw_ruler()
+
+    # --- ruler ------------------------------------------------------------
+    def _nice_step(self, min_px: float = 64.0) -> int:
+        """Studs per labelled tick: the smallest round number whose on-screen
+        spacing is at least min_px, so labels stay readable and never crowd."""
+        for s in (10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000, 5000):
+            if s * self.scale >= min_px:
+                return s
+        return 5000
+
+    def _draw_ruler(self) -> None:
+        """A drafting-style ruler down the top and left edges, ticked and labelled
+        in studs measured from the plate centre (0), matching at_studs. Numbers
+        auto-space with the zoom; the 0 tick is picked out so the middle is easy
+        to find. 1 world unit = 1 / geo.STUD studs, noted in the corner."""
+        c = self.canvas
+        w = c.winfo_width()
+        h = c.winfo_height()
+        if w <= 1 or h <= 1:
+            return
+        gut = 24
+        step = self._nice_step()
+        minor = max(1, step // 5)
+
+        def ticks(lo: int, hi: int, s: int):
+            v = (lo // s) * s
+            while v <= hi:
+                if v >= lo:
+                    yield v
+                v += s
+
+        x_lo, _ = self.world(gut, 0)
+        x_hi, _ = self.world(w, 0)
+        _, y_lo = self.world(0, gut)
+        _, y_hi = self.world(0, h)
+
+        c.create_rectangle(0, 0, w, gut, fill=BG, outline=GRID_MAJOR)
+        c.create_rectangle(0, 0, gut, h, fill=BG, outline=GRID_MAJOR)
+        c.create_rectangle(0, 0, gut, gut, fill=BG, outline=GRID_MAJOR)
+        c.create_text(gut / 2, gut / 2, text="studs", fill=GRID_MAJOR,
+                      font=("TkDefaultFont", 6))
+
+        # top edge: x ticks
+        for v in ticks(x_lo, x_hi, minor):
+            sx, _ = self.screen(v, 0)
+            if sx <= gut:
+                continue
+            major = v % step == 0
+            col = SELECTED if v == 0 else (TEXT if major else GRID_MAJOR)
+            c.create_line(sx, gut - (9 if major else 4), sx, gut, fill=col)
+            if major:
+                c.create_text(sx, 8, text=str(v), fill=col, font=("TkDefaultFont", 7))
+
+        # left edge: y ticks, numbers turned to fit the narrow gutter
+        for v in ticks(y_lo, y_hi, minor):
+            _, sy = self.screen(0, v)
+            if sy <= gut:
+                continue
+            major = v % step == 0
+            col = SELECTED if v == 0 else (TEXT if major else GRID_MAJOR)
+            c.create_line(gut - (9 if major else 4), sy, gut, sy, fill=col)
+            if major:
+                c.create_text(9, sy, text=str(v), fill=col, angle=90,
+                              font=("TkDefaultFont", 7))
 
 
 def main(argv: list[str] | None = None) -> int:

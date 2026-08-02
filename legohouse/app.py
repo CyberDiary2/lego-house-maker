@@ -236,9 +236,19 @@ class DesignerApp:
     def on_release(self, event) -> None:
         if self.tool.get() == "interior" and self.drag_start and self.drag_now:
             if self.drag_start != self.drag_now:
-                self.storey.interior_walls.append(
-                    InteriorWall(a=self.drag_start, b=self.drag_now)
-                )
+                fp = self.design.footprint
+                if fp and geo.is_rectilinear(fp):
+                    clipped = geo.clip_interior_wall(fp, self.drag_start, self.drag_now)
+                else:
+                    clipped = (self.drag_start, self.drag_now)
+                if clipped is None:
+                    self.status.config(text="interior wall would sit inside an exterior wall -- not added")
+                else:
+                    self._push_undo()
+                    a, b = clipped
+                    self.storey.interior_walls.append(InteriorWall(a=a, b=b))
+                    if (a, b) != (self.drag_start, self.drag_now):
+                        self.status.config(text="interior wall trimmed to the exterior walls' inner faces")
             self.drag_start = None
             self.drag_now = None
             self.redraw()
@@ -258,6 +268,30 @@ class DesignerApp:
             return (b[0], a[1])
         return (a[0], b[1])
 
+    def _reclip_interior_walls(self) -> int:
+        """Re-trim every storey's interior walls to the current footprint, so a
+        wall that pokes into an exterior wall after the outline changed is cut
+        back to the inner face (and one now wholly inside a wall is dropped).
+        Returns how many walls were changed or removed."""
+        fp = self.design.footprint
+        if not (fp and geo.is_rectilinear(fp)):
+            return 0
+        changed = 0
+        for storey in self.design.storeys:
+            kept = []
+            for w in storey.interior_walls:
+                clipped = geo.clip_interior_wall(fp, tuple(w.a), tuple(w.b))
+                if clipped is None:
+                    changed += 1
+                    continue
+                a, b = clipped
+                if (a, b) != (tuple(w.a), tuple(w.b)):
+                    w.a, w.b = a, b
+                    changed += 1
+                kept.append(w)
+            storey.interior_walls = kept
+        return changed
+
     def place_footprint_point(self, x: float, y: float) -> None:
         point = (int(x), int(y))
         if not self.draft:
@@ -271,7 +305,11 @@ class DesignerApp:
             if closed and geo.is_rectilinear(closed):
                 self.design.footprint = closed
                 self.draft = []
-                self.status.config(text=f"footprint closed: {len(closed)} walls")
+                trimmed = self._reclip_interior_walls()
+                msg = f"footprint closed: {len(closed)} walls"
+                if trimmed:
+                    msg += f" ({trimmed} interior wall(s) trimmed to fit)"
+                self.status.config(text=msg)
             else:
                 self.status.config(text="that would not close into a rectilinear shape")
             return
@@ -336,8 +374,9 @@ class DesignerApp:
         return best[1], best[2], best[3]
 
     def place_ramp(self, x: float, y: float) -> None:
-        if self.storey_index >= len(self.design.storeys) - 1:
-            self.status.config(text="top storey: add a storey above before placing a ramp")
+        is_top = self.storey_index >= len(self.design.storeys) - 1
+        if is_top and not self.design.roof:
+            self.status.config(text="top storey has no roof: add a roof or a storey above before placing a ramp")
             return
         ramp = Ramp(at=(int(x), int(y)), direction=self.ramp_dir.get())
         problems = ramp.validate(self.design, self.storey_index)

@@ -119,6 +119,66 @@ def point_in_footprint(footprint: list[tuple[int, int]], x: float, y: float) -> 
     return inside
 
 
+def _boundary_crossings(footprint, axis: str, fixed: int) -> list[float]:
+    """Where a line crosses the footprint boundary, sorted along the line.
+
+    The line runs parallel to `axis` ("x" or "y") with its other coordinate held
+    at `fixed`. For a rectilinear footprint the returned coordinates pair up into
+    alternating inside/outside spans: (xs[0], xs[1]) is inside, (xs[1], xs[2]) is
+    outside, and so on -- the same even-odd rule point_in_footprint() uses.
+    """
+    xs: list[float] = []
+    for (x1, y1), (x2, y2) in edges(footprint):
+        if axis == "x":  # horizontal line at y == fixed; record the x it crosses at
+            if (y1 > fixed) != (y2 > fixed):
+                xs.append(x1 + (fixed - y1) * (x2 - x1) / (y2 - y1))
+        else:            # vertical line at x == fixed; record the y it crosses at
+            if (x1 > fixed) != (x2 > fixed):
+                xs.append(y1 + (fixed - x1) * (y2 - y1) / (x2 - x1))
+    xs.sort()
+    return xs
+
+
+def clip_interior_wall(footprint, a, b, inset: int | None = None):
+    """Trim an axis-aligned interior wall so its ends land on the INNER FACE of
+    the exterior walls, never running into them or straight through.
+
+    Exterior walls are WALL_STUDS thick and centred on the footprint line, so the
+    clear inside of a room is that line pulled in by WALL_STUDS // 2 studs. The
+    wall is clamped to the room its middle sits in, and only ever shortened --
+    never stretched past what was drawn. Returns the clamped ((x, y), (x, y)), or
+    None when nothing of the wall lands inside a room (drawn in a wall or outside
+    the building). A diagonal or zero-length segment is returned untouched, for
+    InteriorWall.validate() to report.
+    """
+    if inset is None:
+        inset = WALL_STUDS // 2
+    (x1, y1), (x2, y2) = a, b
+    if y1 == y2 and x1 != x2:
+        axis, fixed, v0, v1 = "x", y1, x1, x2
+    elif x1 == x2 and y1 != y2:
+        axis, fixed, v0, v1 = "y", x1, y1, y2
+    else:
+        return (tuple(a), tuple(b))
+    lo, hi = (v0, v1) if v0 <= v1 else (v1, v0)
+    crossings = _boundary_crossings(footprint, axis, fixed)
+    mid = (lo + hi) / 2.0
+    room = None
+    for i in range(0, len(crossings) - 1, 2):
+        if crossings[i] <= mid <= crossings[i + 1]:
+            room = (crossings[i], crossings[i + 1])
+            break
+    if room is None:
+        return None
+    new_lo = int(round(max(lo, room[0] + inset)))
+    new_hi = int(round(min(hi, room[1] - inset)))
+    if new_hi - new_lo < 1:  # the whole wall was inside the exterior wall band
+        return None
+    if axis == "x":
+        return ((new_lo, fixed), (new_hi, fixed))
+    return ((fixed, new_lo), (fixed, new_hi))
+
+
 # --- recommended sizes -------------------------------------------------------
 # What "normal" looks like, so the editor can show it next to each control and
 # you are not guessing at numbers with no reference. These are the values the

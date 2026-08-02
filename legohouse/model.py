@@ -161,14 +161,18 @@ class Design:
                     problems += [f"{where}: {p}" for p in opening.validate(self, i)]
                 for wall in storey.interior_walls:
                     problems += [f"{where}: {p}" for p in wall.validate(self, i)]
-                # the topmost storey has nothing above it to climb to
-                if i < len(self.storeys) - 1:
+                # A ramp climbs to whatever sits above this storey: the next
+                # floor, or -- on the top storey -- the roof, when the design has
+                # one (the game cuts the roof slab open for it just as it does an
+                # interior floor). Only a top-storey ramp with no roof above it
+                # truly leads nowhere.
+                if i < len(self.storeys) - 1 or self.roof:
                     for ramp in storey.ramps:
                         problems += [f"{where}: {p}" for p in ramp.validate(self, i)]
                 elif storey.ramps:
                     problems.append(
-                        f"{where}: has a ramp but is the top storey, so it leads nowhere "
-                        "(add a roof or another storey above it)"
+                        f"{where}: has a ramp but is the top storey with no roof, so "
+                        "it leads nowhere (add a roof or another storey above it)"
                     )
         # a building bots can enter but not climb is worth warning about
         for i, storey in enumerate(self.storeys[:-1]):
